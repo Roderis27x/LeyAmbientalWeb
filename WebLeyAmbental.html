@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Explorador Interactivo de Legislación Ambiental Panameña</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Visualization & Content Choices:
+    - Introduction:
+        - Text: Overview of SPA, summary of report's intro (Ley 41, MiAMBIENTE). Goal: Contextualize. Method: HTML text. Interaction: Read. Justification: Essential intro.
+        - Chart (Bar): Number of principal laws per thematic area. Goal: Overview of legislative density. Method: Chart.js. Interaction: View. Justification: Quick visual summary.
+        - Timeline (Simple HTML/CSS): Key foundational laws (Ley 41 1998, Ley 8 2015). Goal: Show evolution of general framework. Method: HTML/CSS. Interaction: View. Justification: Highlights key milestones.
+    - Thematic Sections (12):
+        - Text: Introductory paragraph for each theme, summarizing its scope based on the report. Goal: Set context for the laws in that theme. Method: HTML text. Interaction: Read. Justification: Guides user.
+        - Law Cards: For each law in a theme (from report's summary table and detailed text): Normativa, Gaceta, Breve Descripción, Entidades. Goal: Summarize key laws. Method: HTML cards. Interaction: Click to expand/show details. Justification: Digestible summaries with option for depth.
+        - Law Details (on click): Expanded view with more detailed summary from the report's narrative for that specific law. Goal: Provide deeper understanding. Method: JS to show/hide detailed text block. Interaction: Read. Justification: Allows focused study.
+    - Conclusion Section:
+        - Text: Summary of report's conclusions. Goal: Summarize overall findings. Method: HTML text. Interaction: Read. Justification: Completes the report overview.
+    - General: Navigation bar for thematic areas. Goal: Easy access to all sections. Method: HTML/JS. Interaction: Click. Justification: Standard SPA navigation.
+    - CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. All visualizations via Chart.js (Canvas) or HTML/CSS. -->
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #FAF3E0;
+            color: #4A4A4A;
+        }
+        .nav-button {
+            padding: 8px 16px;
+            margin: 4px 6px; 
+            border-radius: 8px;
+            background-color: #FDF5E6;
+            color: #4A4A4A;
+            transition: background-color 0.3s, color 0.3s;
+            cursor: pointer;
+            border: 1px solid #E57373;
+            display: inline-block; 
+        }
+        .nav-button:hover, .nav-button.active {
+            background-color: #E57373;
+            color: white;
+        }
+        .content-section {
+            display: none;
+            padding: 20px;
+            background-color: #FDF5E6;
+            border-radius: 8px;
+            margin-top: 16px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .content-section.active {
+            display: block;
+        }
+        .law-card {
+            background-color: white;
+            border: 1px solid #E0E0E0;
+            border-left: 5px solid #A5D6A7;
+            padding: 16px;
+            margin-bottom: 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: box-shadow 0.3s;
+        }
+        .law-card:hover {
+            box-shadow: 0 6px 12px rgba(0,0,0,0.1);
+        }
+        .law-card h3 {
+            color: #4A4A4A;
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+        .law-card p {
+            font-size: 0.9rem;
+            margin-top: 4px;
+        }
+        .law-detail {
+            background-color: #F9F9F9;
+            padding: 16px;
+            margin-top: 8px;
+            border-radius: 6px;
+            border: 1px dashed #E0E0E0;
+            font-size: 0.9rem;
+            line-height: 1.6;
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 700px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 350px;
+            max-height: 400px;
+            background-color: white;
+            padding: 16px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        .timeline {
+            position: relative;
+            max-width: 600px;
+            margin: 30px auto;
+            padding: 20px 0;
+        }
+        .timeline::before {
+            content: '';
+            position: absolute;
+            left: 50%;
+            width: 2px;
+            height: 100%;
+            background: #E57373;
+            transform: translateX(-50%);
+        }
+        .timeline-item {
+            padding: 10px 40px;
+            position: relative;
+            background: inherit;
+            width: 50%;
+        }
+        .timeline-item:nth-child(odd) {
+            left: 0;
+            padding-right: 20px;
+            text-align: right;
+        }
+        .timeline-item:nth-child(even) {
+            left: 50%;
+            padding-left: 20px;
+            text-align: left;
+        }
+        .timeline-item::after {
+            content: '';
+            position: absolute;
+            width: 16px;
+            height: 16px;
+            right: -8px;
+            background-color: white;
+            border: 3px solid #E57373;
+            top: 15px;
+            border-radius: 50%;
+            z-index: 1;
+        }
+        .timeline-item:nth-child(even)::after {
+            left: -8px;
+        }
+        .timeline-content {
+            padding: 15px;
+            background: white;
+            position: relative;
+            border-radius: 6px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        .timeline-content h4 {
+            font-weight: 600;
+            color: #E57373;
+        }
+        @media screen and (max-width: 768px) {
+            .timeline::before {
+                left: 8px;
+            }
+            .timeline-item {
+                width: 100%;
+                padding-left: 30px;
+                padding-right: 10px;
+            }
+            .timeline-item:nth-child(odd), .timeline-item:nth-child(even) {
+                left: 0%;
+                text-align: left;
+            }
+            .timeline-item::after {
+                left: 0px;
+            }
+             .nav-button { 
+                margin: 5px 3px;
+            }
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.5);
+        }
+        .modal-content {
+            background-color: #FDF5E6;
+            margin: 10% auto;
+            padding: 25px;
+            border: 1px solid #E57373;
+            border-radius: 8px;
+            width: 80%;
+            max-width: 700px;
+            position: relative;
+        }
+        .close-button {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .close-button:hover,
+        .close-button:focus {
+            color: #4A4A4A;
+            text-decoration: none;
+        }
+        h1, h2, h3 {
+            color: #4A4A4A;
+        }
+        h2 {
+            border-bottom: 2px solid #E57373;
+            padding-bottom: 8px;
+            margin-bottom: 16px;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+    <header class="text-center mb-8">
+        <h1 class="text-3xl md:text-4xl font-bold">Explorador Interactivo de Legislación Ambiental Panameña</h1>
+    </header>
+
+    <nav id="mainNav" class="flex flex-wrap justify-center mb-6">
+    </nav>
+
+    <main id="mainContent">
+    </main>
+
+    <div id="lawDetailModal" class="modal">
+        <div class="modal-content">
+            <span class="close-button" onclick="closeModal()">&times;</span>
+            <h2 id="modalTitle" class="text-2xl font-semibold mb-4"></h2>
+            <p id="modalGaceta" class="text-sm text-gray-600 mb-1"></p>
+            <p id="modalEntidades" class="text-sm text-gray-600 mb-3"></p>
+            <div id="modalDescription" class="text-base leading-relaxed"></div>
+        </div>
+    </div>
+
+    <footer class="text-center mt-12 py-4 border-t border-gray-300">
+        <p class="text-sm text-gray-600">Aplicación generada para explorar el "Panorama de la Legislación Ambiental Complementaria en la República de Panamá".</p>
+    </footer>
+
+    <script>
+        const legislacionData = {
+            introduccion: {
+                titulo: "Introducción",
+                contenido: `
+                    <p class="mb-4 text-lg">Bienvenido al Explorador Interactivo de la Legislación Ambiental Panameña. Esta herramienta está diseñada para facilitar la comprensión y navegación a través del complejo marco normativo que rige la protección ambiental en Panamá.</p>
+                    <p class="mb-4">La República de Panamá cuenta con un cuerpo normativo ambiental cuyo eje central es la Ley 41 de 1 de julio de 1998, conocida como la Ley General de Ambiente. Su Texto Único (G.O. 28131-A, 2016) establece las bases para la protección, conservación y recuperación del ambiente, y promueve el uso sostenible de los recursos naturales. Un hito importante fue la Ley N° 8 de 2015, que creó el Ministerio de Ambiente (MiAMBIENTE), fortaleciendo la institucionalidad ambiental del país.</p>
+                    <p class="mb-6">A continuación, se presenta un resumen visual de la densidad legislativa por área temática y una línea de tiempo de las leyes marco fundamentales.</p>
+                    <div class="chart-container my-8 mx-auto">
+                        <canvas id="lawsByAreaChart"></canvas>
+                    </div>
+                    <h3 class="text-xl font-semibold mt-8 mb-4 text-center">Evolución de Leyes Marco Fundamentales</h3>
+                    <div class="timeline">
+                        <div class="timeline-item">
+                            <div class="timeline-content">
+                                <h4>1998</h4>
+                                <p>Ley 41 de 1998 - Ley General de Ambiente. Establece los principios y normas básicas para la gestión ambiental.</p>
+                            </div>
+                        </div>
+                        <div class="timeline-item">
+                            <div class="timeline-content">
+                                <h4>2015</h4>
+                                <p>Ley 8 de 2015 - Crea el Ministerio de Ambiente (MiAMBIENTE) y reforma la Ley General de Ambiente.</p>
+                            </div>
+                        </div>
+                    </div>
+                `
+            },
+            areas: [
+                {
+                    id: "marcoGeneral",
+                    titulo: "Marco General e Institucionalidad",
+                    introduccion: "Esta sección aborda las leyes fundamentales que establecen el marco general y la estructura institucional para la gestión ambiental en Panamá, incluyendo la Ley General de Ambiente y la creación del Ministerio de Ambiente.",
+                    normativas: [
+                        { nombre: "Ley 41 de 1998, Texto Único de 2016", gaceta: "G.O. 28131-A", descripcionCorta: "Establece principios y normas básicas para la protección, conservación y recuperación del ambiente; promueve el uso sostenible de recursos naturales.", entidades: "Ministerio de Ambiente (MiAMBIENTE)", detalle: "La Ley 41 de 1 de julio de 1998, conocida como la Ley General de Ambiente, es la norma marco que sienta las bases y principios fundamentales para la protección, conservación y recuperación del medio ambiente en el territorio nacional, al tiempo que promueve la utilización sostenible de los recursos naturales. Su Texto Único integra las modificaciones introducidas por la Ley 18 de 2003, la Ley 44 de 2006, la Ley 65 de 2010 y la Ley 8 de 2015. Abarca disposiciones generales, la Política Nacional de Ambiente, instrumentos de gestión ambiental (EIA, ordenamiento territorial, normas de calidad), salud ambiental, gestión de recursos naturales, cambio climático, participación ciudadana y responsabilidad ambiental." },
+                        { nombre: "Ley 8 de 2015", gaceta: "G.O. 27749-B", descripcionCorta: "Crea el Ministerio de Ambiente como entidad rectora del Estado en materia ambiental.", entidades: "Ministerio de Ambiente (MiAMBIENTE)", detalle: "La Ley N° 8 de 25 de marzo de 2015 creó el Ministerio de Ambiente (MiAMBIENTE), elevando el rango de la anterior Autoridad Nacional del Ambiente (ANAM). Su objetivo fue consolidar a MiAMBIENTE como la entidad rectora en la protección, conservación, preservación y restauración del ambiente, y en el fomento del uso sostenible de los recursos naturales. Entre sus funciones están la formulación de la política ambiental, emisión de normativas, otorgamiento de permisos y concesiones, promoción de la participación ciudadana y fiscalización." }
+                    ]
+                },
+                {
+                    id: "recursosHidricos",
+                    titulo: "Recursos Hídricos",
+                    introduccion: "La gestión de los recursos hídricos es vital. Esta sección cubre la legislación sobre el uso, protección y conservación de las aguas y cuencas hidrográficas, incluyendo el régimen administrativo especial y los debates sobre una nueva ley general de aguas.",
+                    normativas: [
+                        { nombre: "Decreto Ley N° 35 de 1966", gaceta: "N/A (Histórica)", descripcionCorta: "Reglamenta la explotación y uso de las aguas del Estado conforme al interés social. (Nota: En proceso de reemplazo por nuevo anteproyecto)", entidades: "Ministerio de Ambiente (históricamente, Comisión Nacional de Aguas)", detalle: "Este Decreto Ley, aunque antiguo, ha reglamentado la explotación de las aguas de dominio estatal para diversos fines (domésticos, agrícolas, industriales). Creó la Comisión Nacional de Aguas y estableció regímenes de permisos y concesiones, servidumbres y prevención de la contaminación. Aunque referenciado, su vigencia es desafiada por legislación más moderna y un anteproyecto de ley." },
+                        { nombre: "Ley N° 44 de 2002", gaceta: "N/A", descripcionCorta: "Establece un régimen administrativo especial para el manejo, protección y conservación de las cuencas hidrográficas (excepto la del Canal de Panamá).", entidades: "Ministerio de Ambiente (MiAMBIENTE)", detalle: "Esta ley establece un régimen administrativo especial para el manejo, protección y conservación de las cuencas hidrográficas (excepto la del Canal de Panamá), buscando el desarrollo sostenible y la disponibilidad de recursos para futuras generaciones. Designa a MiAMBIENTE como ente rector y crea los Comités de Cuencas Hidrográficas y un Fondo para su manejo." },
+                        { nombre: "Anteproyecto de Ley No. 232 de 2024 (Presentado)", gaceta: "N/A (Anteproyecto)", descripcionCorta: "Propone un nuevo marco regulatorio para la Gestión Integrada de los Recursos Hídricos.", entidades: "Ministerio de Ambiente (MiAMBIENTE) (propuesto)", detalle: "Este anteproyecto busca establecer un marco regulatorio moderno para la gestión integrada de los recursos hídricos, con la intención de reemplazar legislación existente como el Decreto Ley 35 de 1966. Propone regular el uso sostenible de aguas continentales e insulares, definir el régimen de concesiones, establecer a MiAMBIENTE como autoridad rectora, crear un Sistema Nacional de Información Hídrica y fortalecer los Comités de Cuencas." }
+                    ]
+                },
+                {
+                    id: "calidadSuelo",
+                    titulo: "Calidad del Suelo",
+                    introduccion: "La protección del suelo es fundamental. Aquí se presenta la normativa que establece los estándares de calidad del suelo para proteger la salud humana y los ecosistemas, y las directrices generales para su uso adecuado.",
+                    normativas: [
+                        { nombre: "Decreto Ejecutivo N° 2 de 2009", gaceta: "G.O. 26230", descripcionCorta: "Establece la Norma Ambiental de Calidad de Suelos para proteger la salud humana y los ecosistemas.", entidades: "Ministerio de Ambiente (MiAMBIENTE)", detalle: "Este decreto establece la Norma Ambiental de Calidad de Suelos, aplicable a diversos usos, para proteger la salud humana y los ecosistemas. Define niveles de referencia y límites máximos para contaminantes, métodos de análisis, y los contenidos de Informes Preliminares de Situación, Informes de Caracterización y Planes de Remediación. Es de cumplimiento obligatorio para empresas cuyas actividades puedan representar un riesgo." },
+                        { nombre: "Ley 41 de 1998 (Disposiciones sobre Suelo)", gaceta: "G.O. 28131-A", descripcionCorta: "Artículos 62 y 63 establecen directrices para el uso compatible del suelo con su vocación y la prevención de la degradación.", entidades: "Ministerio de Ambiente (MiAMBIENTE)", detalle: "La Ley General de Ambiente (Art. 62-63) dispone que el uso de los suelos debe ser compatible con su vocación natural y aptitud ecológica, evitando prácticas que favorezcan la erosión o degradación. Sujeta a sanciones las actividades que provoquen degradación severa, incluyendo acciones de recuperación." }
+                    ]
+                },
+                {
+                    id: "calidadAire",
+                    titulo: "Calidad del Aire",
+                    introduccion: "La calidad del aire es crucial para la salud pública. Esta sección detalla las leyes y resoluciones que buscan controlar la contaminación atmosférica, incluyendo controles a combustibles y la adopción de guías internacionales.",
+                    normativas: [
+                        { nombre: "Ley N° 36 de 1996", gaceta: "G.O. 23.040", descripcionCorta: "Establece controles para evitar la contaminación ambiental ocasionada por combustibles y plomo.", entidades: "Ministerio de Ambiente (MiAMBIENTE), Ministerio de Salud (MINSA)", detalle: "Esta ley establece controles para la contaminación del aire por combustibles y plomo, con énfasis en emisiones vehiculares. Prohibió pinturas con alto contenido de plomo, exigió sistemas de control de emisiones en vehículos importados, prohibió la gasolina con plomo desde 2002, e instituyó una red de monitoreo." },
+                        { nombre: "Resolución MINSA No. 021 de 2023", gaceta: "N/A", descripcionCorta: "Adopta valores de referencia de calidad del aire basados en guías de la OMS.", entidades: "Ministerio de Salud (MINSA)", detalle: "El Ministerio de Salud adoptó como valores de referencia para la calidad del aire en Panamá aquellos basados en las guías globales de calidad del aire de la OMS de 2021, buscando establecer estándares actualizados y con base científica internacional." },
+                        { nombre: "Ley 41 de 1998 (Disposiciones sobre Aire)", gaceta: "G.O. 28131-A", descripcionCorta: "Declara el aire como bien de dominio público y encomienda a MiAMBIENTE normar su calidad.", entidades: "Ministerio de Ambiente (MiAMBIENTE)", detalle: "La Ley General de Ambiente declara el aire como bien de dominio público y establece que su conservación es de interés social. Encomienda a MiAMBIENTE, junto con entidades competentes, normar todos los aspectos relativos a la calidad del aire, incluyendo programas de seguimiento y niveles permisibles de contaminantes." }
+                    ]
+                },
+                {
+                    id: "bosquesForestal",
+                    titulo: "Bosques y Forestal",
+                    introduccion: "Los recursos forestales son vitales. Esta sección cubre la legislación para la protección, conservación, manejo y aprovechamiento racional de los bosques, así como los programas de incentivos para la reforestación.",
+                    normativas: [
+                        { nombre: "Ley N° 1 de 1994", gaceta: "G.O. 22.470", descripcionCorta: "Establece la legislación forestal para la protección, conservación, manejo y aprovechamiento racional de los recursos forestales.", entidades: "Ministerio de Ambiente (MiAMBIENTE)", detalle: "Constituye el marco fundamental para la gestión de recursos forestales. Su finalidad es la protección, conservación, mejoramiento, acrecentamiento, educación, investigación, manejo y aprovechamiento racional. Define el Patrimonio Forestal del Estado, regula inventarios, planes de reforestación y manejo, protección contra incendios y plagas, y prohíbe el aprovechamiento en zonas de protección de cuerpos de agua." },
+                        { nombre: "Ley N° 69 de 2017", gaceta: "G.O. 28397-C", descripcionCorta: "Crea un Programa de incentivos para la cobertura forestal y la conservación de bosques naturales.", entidades: "Ministerio de Ambiente (MiAMBIENTE)", detalle: "Esta ley tiene como objetivo proteger, recuperar y conservar la cobertura boscosa, enmarcada en la iniciativa 'Alianza por el Millón de Hectáreas Reforestadas' y los ODS. Establece un programa de incentivos para actividades como protección de bosques naturales, reforestación, sistemas agroforestales, manejo sostenible, y crea el Fondo Reforesta Panamá." }
+                    ]
+                },
+                {
+                    id: "vidaSilvestre",
+                    titulo: "Vida Silvestre",
+                    introduccion: "La protección de la fauna y flora silvestres es esencial. Esta sección presenta la legislación que regula su conservación, investigación, aprovechamiento y el control de especies exóticas.",
+                    normativas: [
+                        { nombre: "Ley N° 24 de 1995", gaceta: "G.O. 22.801", descripcionCorta: "Establece la legislación de vida silvestre, regulando su conservación, investigación y aprovechamiento.", entidades: "Ministerio de Ambiente (MiAMBIENTE)", detalle: "Establece el marco jurídico para la protección y manejo de la vida silvestre. Sus objetivos incluyen regular su conservación, fortalecer la autoridad competente, crear mecanismos de financiamiento, fomentar la participación local e impulsar la investigación. Declara la vida silvestre como patrimonio natural y de dominio público. Prohíbe la utilización y transporte no autorizado de especímenes, regula la importación de especies exóticas y establece regímenes de caza y pesca." }
+                    ]
+                },
+                {
+                    id: "biodiversidadAreasProtegidas",
+                    titulo: "Biodiversidad y Áreas Protegidas",
+                    introduccion: "Panamá es rica en biodiversidad. Esta sección aborda la creación del Sistema Nacional de Áreas Protegidas (SINAP), la conservación de la diversidad biológica, y el régimen de concesiones y manejo compartido en estas áreas.",
+                    normativas: [
+                        { nombre: "Ley 41 de 1998, Título IV, Cap. II", gaceta: "G.O. 28131-A", descripcionCorta: "Crea el Sistema Nacional de Áreas Protegidas (SINAP) y regula la conservación de la biodiversidad y el acceso a recursos genéticos.", entidades: "Ministerio de Ambiente (MiAMBIENTE)", detalle: "Este capítulo de la Ley General de Ambiente crea el SINAP, conformado por todas las áreas protegidas legalmente establecidas. Regula la conservación de la diversidad biológica in situ y ex situ, estimula la creación de reservas privadas y servidumbres ecológicas, y faculta a MiAMBIENTE para regular el acceso a recursos biológicos y genéticos." },
+                        { nombre: "Decreto Ejecutivo N° 33 de 2017", gaceta: "G.O. 28248", descripcionCorta: "Reglamenta el procedimiento para otorgar concesiones de administración en áreas protegidas del SINAP.", entidades: "Ministerio de Ambiente (MiAMBIENTE)", detalle: "Este decreto reglamenta el artículo 51 del Texto Único de la Ley 41 de 1998, detallando el procedimiento para el otorgamiento de concesiones de administración dentro de las áreas protegidas que conforman el SINAP." },
+                        { nombre: "Decreto Ejecutivo N° 59 de 2016", gaceta: "N/A", descripcionCorta: "Crea y regula el manejo compartido en el SINAP.", entidades: "Ministerio de Ambiente (MiAMBIENTE)", detalle: "Busca fortalecer el desarrollo sostenible en áreas protegidas y sus zonas de amortiguamiento, promoviendo la participación efectiva de grupos de interés en la gestión. Requiere que el área protegida cuente con un plan de manejo o zonificación aprobada." }
+                    ]
+                },
+                {
+                    id: "gestionResiduos",
+                    titulo: "Gestión de Residuos",
+                    introduccion: "El manejo adecuado de residuos es crucial. Esta sección cubre la ley de gestión integral de residuos sólidos, que promueve la separación y el reciclaje, y la ley sobre bolsas reutilizables.",
+                    normativas: [
+                        { nombre: "Ley 276 de 2021", gaceta: "G.O. 29445-E", descripcionCorta: "Regula la gestión integral de residuos sólidos, promoviendo la separación y el reciclaje.", entidades: "Municipios, Autoridad de Aseo Urbano y Domiciliario (AAUD), MiAMBIENTE", detalle: "Establece el marco para la gestión integral de residuos sólidos, desde la generación hasta la disposición final. Responsabiliza a diversos actores e impulsa la separación en la fuente y el reciclaje. Contempla incentivos fiscales para el reciclaje y busca promover una economía circular." },
+                        { nombre: "Ley N° 1 de 2018", gaceta: "G.O. 28448-B", descripcionCorta: "Adopta medidas para promover el uso de bolsas reutilizables en establecimientos comerciales.", entidades: "Autoridad de Protección al Consumidor y Defensa de la Competencia (ACODECO), MiAMBIENTE", detalle: "Promueve el uso de bolsas reutilizables y prohíbe el uso de bolsas de polietileno en diversos establecimientos comerciales. ACODECO fiscaliza y MiAMBIENTE realiza campañas de concienciación." }
+                    ]
+                },
+                {
+                    id: "sustanciasPeligrosas",
+                    titulo: "Sustancias y Desechos Peligrosos",
+                    introduccion: "El control de sustancias y desechos peligrosos es vital para la salud y el ambiente. Aquí se presenta la ley que prohíbe la importación de desechos tóxicos y la regulación de sustancias controladas.",
+                    normativas: [
+                        { nombre: "Ley N° 8 de 1991", gaceta: "G.O. 21805", descripcionCorta: "Prohíbe la importación de desechos tóxicos o contaminantes.", entidades: "Ministerio de Salud (MINSA), MiAMBIENTE", detalle: "Prohíbe la importación de desechos tóxicos o contaminantes al territorio panameño. Define desecho tóxico y establece sanciones penales y multas, además de la obligación de devolver los desechos a su origen." },
+                        { nombre: "Ley 14 de 2016", gaceta: "N/A", descripcionCorta: "Regula actividades y uso de sustancias controladas para fines médicos y/o científicos.", entidades: "Ministerio de Salud (MINSA)", detalle: "Regula las actividades y el uso de una lista específica de sustancias controladas para fines médicos y científicos. Indirectamente, contribuye a prevenir la contaminación al tipificar como falta grave el manejo de estas sustancias si están contaminadas, alteradas o vencidas." },
+                        { nombre: "Ley 41 de 1998 (Disposiciones sobre Desechos Peligrosos)", gaceta: "G.O. 28131-A", descripcionCorta: "Establece el deber del Estado de regular el manejo diferenciado de desechos peligrosos y el apoyo a MINSA en la aplicación del Convenio de Basilea.", entidades: "Ministerio de Ambiente (MiAMBIENTE), Ministerio de Salud (MINSA)", detalle: "La Ley General de Ambiente establece el deber del Estado de regular y controlar el manejo diferenciado de los desechos domésticos, industriales y peligrosos. Dispone que MiAMBIENTE apoyará al MINSA en la aplicación del Convenio de Basilea y que el Estado adoptará medidas para el manejo seguro de sustancias potencialmente peligrosas, prohibiendo el registro de aquellas prohibidas en su país de origen." }
+                    ]
+                },
+                {
+                    id: "eia",
+                    titulo: "Evaluación de Impacto Ambiental (EIA)",
+                    introduccion: "La EIA es una herramienta preventiva clave. Esta sección detalla la obligatoriedad de los Estudios de Impacto Ambiental y los decretos que reglamentan este proceso, incluyendo las Guías de Buenas Prácticas Ambientales.",
+                    normativas: [
+                        { nombre: "Ley 41 de 1998, Título II, Cap. III", gaceta: "G.O. 28131-A", descripcionCorta: "Establece la obligatoriedad de EsIA para proyectos que puedan generar riesgo ambiental.", entidades: "Ministerio de Ambiente (MiAMBIENTE)", detalle: "Este capítulo de la Ley General de Ambiente establece la obligatoriedad de realizar un Estudio de Impacto Ambiental (EsIA) previo al inicio de actividades, obras o proyectos que puedan generar riesgo ambiental. Define las etapas del proceso de EIA, incluyendo la participación ciudadana, e introduce las Guías de Buenas Prácticas Ambientales (GBPA) para proyectos de bajo riesgo." },
+                        { nombre: "Decreto Ejecutivo N° 1 de 2023 (modificado por DE N° 2 de 2024)", gaceta: "G.O. 29730-C / G.O. 29998-B", descripcionCorta: "Reglamenta el Proceso de Evaluación de Impacto Ambiental.", entidades: "Ministerio de Ambiente (MiAMBIENTE)", detalle: "Estos decretos establecen las disposiciones detalladas que rigen el Proceso de EIA. Definen la lista de proyectos que requieren EsIA, las categorías de EsIA (I, II, III), contenidos mínimos, y responsabilidades de MiAMBIENTE y otras unidades ambientales. Las modificaciones de 2024 perfeccionan la implementación, incluyendo la paralización de proyectos sin EsIA, funciones de la Dirección de EIA, ajustes a la lista de proyectos, y la obligatoriedad de incluir análisis de adaptación al cambio climático en EsIA de categoría II y III." },
+                        { nombre: "Decreto Ejecutivo N° 111 de 2016", gaceta: "G.O. 28104-A", descripcionCorta: "Aprueba el Reglamento para la Elaboración y Adopción de Guías de Buenas Prácticas Ambientales (GBPA).", entidades: "Ministerio de Ambiente (MiAMBIENTE)", detalle: "Reglamenta el uso de las Guías de Buenas Prácticas Ambientales (GBPA) como un procedimiento simplificado para proyectos de bajo riesgo ambiental. Define 'Buena Práctica Ambiental' y establece responsabilidades y el proceso para acogerse a una GBPA." }
+                    ]
+                },
+                {
+                    id: "cambioClimatico",
+                    titulo: "Cambio Climático",
+                    introduccion: "Panamá aborda el cambio climático con un marco legal específico. Esta sección cubre las leyes de adaptación y mitigación, la ratificación de acuerdos internacionales y los programas nacionales.",
+                    normativas: [
+                        { nombre: "Ley 41 de 1998, Título V", gaceta: "G.O. 28131-A", descripcionCorta: "Establece el marco para la adaptación y mitigación al cambio climático.", entidades: "Ministerio de Ambiente (MiAMBIENTE)", detalle: "Este título de la Ley General de Ambiente reconoce el cambio climático como una amenaza y encomienda a MiAMBIENTE impulsar iniciativas de adaptación (creando el Fondo de Adaptación) y mitigación (elaborando inventarios de emisiones y estrategias de desarrollo bajo en carbono)." },
+                        { nombre: "Ley N° 10 de 1995", gaceta: "G.O. 22771", descripcionCorta: "Aprueba la Convención Marco de las Naciones Unidas sobre el Cambio Climático (CMNUCC).", entidades: "Estado Panameño", detalle: "Mediante esta ley, Panamá aprueba y ratifica la Convención Marco de las Naciones Unidas sobre el Cambio Climático, integrándola a su ordenamiento jurídico." },
+                        { nombre: "Ley N° 40 de 2016", gaceta: "G.O. 28118-A", descripcionCorta: "Aprueba el Acuerdo de París.", entidades: "Estado Panameño", detalle: "Esta ley aprueba el Acuerdo de París, adoptado en la COP21, comprometiendo a Panamá con los esfuerzos globales para combatir el cambio climático." },
+                        { nombre: "Decreto Ejecutivo N° 100 de 2020", gaceta: "G.O. 29138-C", descripcionCorta: "Reglamenta la mitigación del cambio climático y crea el Programa Nacional Reduce Tu Huella.", entidades: "Ministerio de Ambiente (MiAMBIENTE)", detalle: "Reglamenta el capítulo de Mitigación de la Ley 41. Crea el Programa Nacional Reduce Tu Huella para la gestión y monitoreo del desarrollo económico y social bajo en carbono." },
+                        { nombre: "Decreto Ejecutivo N° 135 de 2021", gaceta: "G.O. 29284-A", descripcionCorta: "Reglamenta la adaptación al cambio climático global.", entidades: "Ministerio de Ambiente (MiAMBIENTE)", detalle: "Reglamenta el capítulo de Adaptación de la Ley 41. Crea el Sistema Nacional de Datos de Adaptación, el Sistema de Monitoreo, Evaluación y Reporte de la Adaptación (M&E-Adaptación Panamá), activa el Fondo de Adaptación y crea el Programa Nacional Construye tu Resiliencia." },
+                        { nombre: "Ley 295 de 2022", gaceta: "G.O. 29523-A", descripcionCorta: "Incentiva la movilidad eléctrica en el transporte terrestre.", entidades: "Secretaría Nacional de Energía, MiAMBIENTE, ATTT", detalle: "Busca reducir emisiones de GEI, promover la movilidad eléctrica y el uso de energías renovables en el transporte terrestre." },
+                        { nombre: "Resolución DM-0083-2024 (MiAMBIENTE)", gaceta: "N/A", descripcionCorta: "Aprueba el Sistema de Monitoreo, Evaluación y Reporte de la Adaptación de Panamá (M&E-Adaptación Panamá).", entidades: "Ministerio de Ambiente (MiAMBIENTE)", detalle: "Tiene como objetivo medir los avances en adaptación al cambio climático. La información generada formará parte de los reportes a la CMNUCC y se incluirá en la Plataforma Nacional de Transparencia Climática." }
+                    ]
+                },
+                {
+                    id: "participacionCiudadana",
+                    titulo: "Participación Ciudadana y Gobernanza",
+                    introduccion: "La participación ciudadana es clave para la gobernanza ambiental. Esta sección destaca las leyes que establecen el derecho al acceso a la información, la participación en EIA y la creación de comisiones consultivas.",
+                    normativas: [
+                        { nombre: "Ley 41 de 1998 (Disposiciones sobre Participación)", gaceta: "G.O. 28131-A", descripcionCorta: "Establece el derecho de acceso a la información y participación en EIA.", entidades: "Ministerio de Ambiente (MiAMBIENTE)", detalle: "La Ley General de Ambiente incluye la participación ciudadana como etapa fundamental en la EIA (Art. 9), consagra el derecho de libre acceso a la información ambiental (Art. 30) y reconoce los intereses colectivos y difusos, legitimando la participación ciudadana en procesos por daños ambientales (Art. 106)." },
+                        { nombre: "Ley 8 de 2015 (Comisiones Consultivas)", gaceta: "G.O. 27749-B", descripcionCorta: "Crea las comisiones consultivas de ambiente.", entidades: "Ministerio de Ambiente (MiAMBIENTE)", detalle: "Esta ley, que crea MiAMBIENTE, también establece las comisiones consultivas provinciales, comarcales y distritales de ambiente como espacios de diálogo entre la sociedad civil y el gobierno para analizar temas ambientales y formular recomendaciones." },
+                        { nombre: "Decreto Ejecutivo N° 3 de 2024", gaceta: "G.O. 30024-C", descripcionCorta: "Reglamenta la conformación y funcionamiento de las Comisiones Consultivas de Ambiente.", entidades: "Ministerio de Ambiente (MiAMBIENTE)", detalle: "Este reciente decreto reglamenta la conformación y funcionamiento de las Comisiones Consultivas de Ambiente a nivel Nacional, Provincial, Distrital y Comarcal, buscando fortalecerlas como mecanismos para la gobernanza ambiental y la participación ciudadana efectiva, en línea con el Acuerdo de Escazú." }
+                    ]
+                }
+            ],
+            conclusion: {
+                titulo: "Conclusiones del Informe",
+                contenido: `
+                    <p class="mb-3">El panorama legislativo ambiental de Panamá, con la Ley 41 de 1998 como eje y la Ley 8 de 2015 fortaleciendo la institucionalidad con MiAMBIENTE, se complementa con un diversificado conjunto de normativas sectoriales. Este entramado aborda la gestión de recursos naturales, instrumentos de gestión transversal como la EIA, residuos, sustancias peligrosas, cambio climático y participación ciudadana.</p>
+                    <p class="mb-3">Se observa una tendencia hacia la modernización y tecnificación de la normativa (EIA, calidad del aire) y una evolución en los enfoques de gestión, incorporando incentivos económicos y mecanismos de mercado (sector forestal, economía circular en residuos).</p>
+                    <p class="mb-3">La creación de MiAMBIENTE buscó consolidar la rectoría ambiental, aunque persisten desafíos en coordinación, implementación y fiscalización. La necesidad de actualizar marcos legales antiguos es evidente (ej. Anteproyecto Ley de Aguas 2024).</p>
+                    <p class="mb-3">La incorporación de la variable de cambio climático en EsIA y el desarrollo normativo específico para adaptación y mitigación demuestran un compromiso con agendas globales. La reciente reglamentación de Comisiones Consultivas (Acuerdo de Escazú) apunta a fortalecer la democracia ambiental.</p>
+                    <p class="mb-3">En síntesis, si bien Panamá cuenta con un marco legal ambiental robusto y en actualización, los retos principales radican en asegurar su plena implementación, fortalecer capacidades institucionales, garantizar coordinación interinstitucional y fomentar una cultura de cumplimiento y responsabilidad ambiental. La efectividad de este andamiaje dependerá de la voluntad política, recursos adecuados y participación ciudadana informada.</p>
+                `
+            }
+        };
+
+        const mainNav = document.getElementById('mainNav');
+        const mainContent = document.getElementById('mainContent');
+        const modal = document.getElementById('lawDetailModal');
+        const modalTitle = document.getElementById('modalTitle');
+        const modalGaceta = document.getElementById('modalGaceta');
+        const modalEntidades = document.getElementById('modalEntidades');
+        const modalDescription = document.getElementById('modalDescription');
+        
+
+        function closeModal() {
+            modal.style.display = "none";
+        }
+
+        window.onclick = function(event) {
+            if (event.target == modal) {
+                closeModal();
+            }
+        }
+
+        function displayContent(sectionId) {
+            mainContent.innerHTML = ''; 
+            const navButtons = mainNav.querySelectorAll('.nav-button');
+            navButtons.forEach(btn => btn.classList.remove('active'));
+            
+            const activeButton = mainNav.querySelector(`[data-section="${sectionId}"]`);
+            if (activeButton) {
+                activeButton.classList.add('active');
+            }
+
+            let sectionHtml = '';
+            if (sectionId === 'introduccion') {
+                const intro = legislacionData.introduccion;
+                sectionHtml = `<div id="introduccion" class="content-section active">
+                                <h2 class="text-2xl font-semibold mb-4">${intro.titulo}</h2>
+                                ${intro.contenido}
+                               </div>`;
+                mainContent.innerHTML = sectionHtml;
+                renderLawsByAreaChart();
+            } else if (sectionId === 'conclusion') {
+                const conclusion = legislacionData.conclusion;
+                 sectionHtml = `<div id="conclusion" class="content-section active">
+                                <h2 class="text-2xl font-semibold mb-4">${conclusion.titulo}</h2>
+                                ${conclusion.contenido}
+                               </div>`;
+                mainContent.innerHTML = sectionHtml;
+            } else {
+                const area = legislacionData.areas.find(a => a.id === sectionId);
+                if (area) {
+                    sectionHtml = `
+                        <div id="${area.id}" class="content-section active">
+                            <h2 class="text-2xl font-semibold mb-2">${area.titulo}</h2>
+                            <p class="mb-6 text-md text-gray-700">${area.introduccion}</p>
+                    `;
+                    area.normativas.forEach(norma => {
+                        sectionHtml += `
+                            <div class="law-card" onclick="showLawDetail('${area.id}', '${norma.nombre.replace(/'/g, "\\'")}')">
+                                <h3 class="font-semibold">${norma.nombre}</h3>
+                                <p class="text-sm text-gray-500"><strong>Gaceta:</strong> ${norma.gaceta}</p>
+                                <p class="text-sm mt-1"><strong>Descripción:</strong> ${norma.descripcionCorta}</p>
+                                <p class="text-sm text-gray-600 mt-1"><strong>Entidad(es):</strong> ${norma.entidades}</p>
+                            </div>
+                        `;
+                    });
+                    sectionHtml += `</div>`;
+                    mainContent.innerHTML = sectionHtml;
+                }
+            }
+        }
+        
+        function showLawDetail(areaId, normaNombre) {
+            const area = legislacionData.areas.find(a => a.id === areaId);
+            if (area) {
+                const norma = area.normativas.find(n => n.nombre === normaNombre);
+                if (norma) {
+                    modalTitle.textContent = norma.nombre;
+                    modalGaceta.textContent = `Gaceta Oficial: ${norma.gaceta}`;
+                    modalEntidades.textContent = `Entidad(es) Principal(es): ${norma.entidades}`;
+                    modalDescription.innerHTML = `<p><strong>Objetivo Principal:</strong> ${norma.descripcionCorta}</p><hr class="my-3"><p class="text-justify">${norma.detalle.replace(/\n/g, '<br>')}</p>`;
+                    modal.style.display = "block";
+                }
+            }
+        }
+
+        function initNav() {
+            const sections = [
+                { id: 'introduccion', titulo: 'Introducción' },
+                ...legislacionData.areas.map(a => ({ id: a.id, titulo: a.titulo })),
+                { id: 'conclusion', titulo: 'Conclusión' }
+            ];
+
+            sections.forEach(section => {
+                const button = document.createElement('button');
+                button.classList.add('nav-button');
+                button.textContent = section.titulo;
+                button.dataset.section = section.id;
+                button.onclick = () => displayContent(section.id);
+                mainNav.appendChild(button);
+            });
+        }
+        
+        function renderLawsByAreaChart() {
+            const ctx = document.getElementById('lawsByAreaChart').getContext('2d');
+            if (!ctx) return; 
+            const areas = legislacionData.areas.map(a => a.titulo);
+            const counts = legislacionData.areas.map(a => a.normativas.length);
+
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: areas,
+                    datasets: [{
+                        label: 'Número de Normativas Principales',
+                        data: counts,
+                        backgroundColor: '#A5D6A7', 
+                        borderColor: '#8FBC8F',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                stepSize: 1
+                            }
+                        },
+                        x: {
+                            ticks: {
+                                callback: function(value, index, values) {
+                                    const label = this.getLabelForValue(value);
+                                    return label.length > 15 ? label.substring(0, 15) + '...' : label;
+                                }
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top',
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    let label = context.dataset.label || '';
+                                    if (label) {
+                                        label += ': ';
+                                    }
+                                    if (context.parsed.y !== null) {
+                                        label += context.parsed.y;
+                                    }
+                                    return label;
+                                },
+                                title: function(tooltipItems) {
+                                    return tooltipItems[0].label; 
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        initNav();
+        displayContent('introduccion'); 
+
+    </script>
+</body>
+</html>
